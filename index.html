@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Männedorf WebGIS - Bauzonen</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .header-info {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .main-container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+        
+        .sidebar {
+            width: 320px;
+            background: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-section {
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .sidebar-section h3 {
+            color: #2c3e50;
+            font-size: 16px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .layer-panel {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        
+        .layer-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .opacity-slider {
+            width: 100%;
+            margin-top: 5px;
+        }
+        
+        .search-box {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .filter-group {
+            margin-bottom: 15px;
+        }
+        
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            color: #495057;
+            font-weight: 500;
+        }
+        
+        select, input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 10px;
+            background: #2a5298;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover {
+            background: #1e3c72;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .map-toolbar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            padding: 10px;
+        }
+        
+        .toolbar-btn {
+            display: block;
+            width: 40px;
+            height: 40px;
+            margin-bottom: 5px;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.2s;
+        }
+        
+        .toolbar-btn:hover {
+            background: #e9ecef;
+            border-color: #2a5298;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+        
+        .legend-color {
+            width: 30px;
+            height: 20px;
+            border: 1px solid #333;
+            border-radius: 3px;
+        }
+        
+        .coordinate-display {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.95);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: monospace;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 1000;
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            font-size: 18px;
+            color: #2a5298;
+        }
+        
+        .loading-overlay.hidden {
+            display: none;
+        }
+        
+        .info-panel {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            max-width: 400px;
+            z-index: 1000;
+        }
+        
+        .info-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            font-size: 13px;
+        }
+        
+        .stat-item {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        
+        .stat-label {
+            font-weight: 500;
+            color: #6c757d;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        
+        .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .attribute-table-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 300px;
+            background: white;
+            border-top: 2px solid #dee2e6;
+            z-index: 1000;
+            transform: translateY(100%);
+            transition: transform 0.3s;
+        }
+        
+        .attribute-table-container.open {
+            transform: translateY(0);
+        }
+        
+        .table-header {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .table-content {
+            overflow-y: auto;
+            height: calc(100% - 45px);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        
+        th {
+            background: #e9ecef;
+            padding: 8px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #f1f3f5;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+        
+        .table-toggle-btn {
+            position: absolute;
+            bottom: 300px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            border: 1px solid #dee2e6;
+            border-bottom: none;
+            padding: 8px 20px;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            z-index: 1001;
+            font-size: 14px;
+            transition: bottom 0.3s;
+        }
+        
+        .table-toggle-btn.table-closed {
+            bottom: 0;
+        }
+        
+        .layer-status {
+            font-size: 11px;
+            color: #28a745;
+            margin-top: 5px;
+        }
+        
+        .status-error {
+            color: #dc3545;
+        }
+        
+        .popup-content {
+            max-width: 400px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .popup-section {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .popup-section:last-child {
+            border-bottom: none;
+        }
+        
+        .filtered-layer {
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>🗺️ Männedorf WebGIS</h1>
+            <div class="header-info">Geodatenportal für Bauzonen und Raumplanung</div>
+        </div>
+        <div class="header-info">
+            Kanton Zürich | Gemeinde Männedorf
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <h3>📍 Suche</h3>
+                <input type="text" class="search-box" placeholder="Adresse, Parzelle oder Koordinaten..." id="searchInput">
+                <button class="btn" onclick="searchLocation()">Suchen</button>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>🗺️ Kartengrundlagen</h3>
+                <div class="layer-panel" onclick="changeBaseLayer('osm')">
+                    <div class="layer-panel-header">
+                        <label>
+                            <input type="radio" name="baselayer" checked> OpenStreetMap
+                        </label>
+                    </div>
+                </div>
+                <div class="layer-panel" onclick="changeBaseLayer('satellite')">
+                    <div class="layer-panel-header">
+                        <label>
+                            <input type="radio" name="baselayer"> Satellitenbild
+                        </label>
+                    </div>
+                </div>
+                <div class="layer-panel" onclick="changeBaseLayer('topo')">
+                    <div class="layer-panel-header">
+                        <label>
+                            <input type="radio" name="baselayer"> Topografische Karte
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>📑 Themen-Layer</h3>
+                
+                <div class="layer-panel">
+                    <div class="layer-panel-header">
+                        <label>
+                            <input type="checkbox" checked onchange="toggleLayer('zones_wfs')">
+                            🏘️ Bauzonen Männedorf (WFS)
+                        </label>
+                    </div>
+                    <input type="range" class="opacity-slider" min="0" max="100" value="70" onchange="changeLayerOpacity('zones_wfs', this.value)">
+                    <div class="layer-status" id="statusWFS">✓ Geladen</div>
+                </div>
+
+                <div class="layer-panel">
+                    <div class="layer-panel-header">
+                        <label>
+                            <input type="checkbox" checked onchange="toggleLayer('zones_dummy')">
+                            🏘️ Bauzonen Männedorf (Demo)
+                        </label>
+                    </div>
+                    <input type="range" class="opacity-slider" min="0" max="100" value="60" onchange="changeLayerOpacity('zones_dummy', this.value)">
+                    <div class="layer-status">✓ Geladen</div>
+                </div>
+
+                <div class="layer-panel">
+                    <div class="layer-panel-header">
+                        <label>
+                            <input type="checkbox" onchange="toggleLayer('bauzonen_ch')">
+                            🇨🇭 Bauzonen Schweiz (harmonisiert)
+                        </label>
+                    </div>
+                    <input type="range" class="opacity-slider" min="0" max="100" value="50" onchange="changeLayerOpacity('bauzonen_ch', this.value)">
+                    <div class="layer-status">Bereit</div>
+                </div>
+
+                <div class="layer-panel">
+                    <div class="layer-panel-header">
+                        <label>
+                            <input type="checkbox" onchange="toggleLayer('gemeindegrenzen')">
+                            🗺️ Gemeindegrenzen
+                        </label>
+                    </div>
+                    <input type="range" class="opacity-slider" min="0" max="100" value="70" onchange="changeLayerOpacity('gemeindegrenzen', this.value)">
+                    <div class="layer-status">Bereit</div>
+                </div>
+
+                <div class="layer-panel">
+                    <div class="layer-panel-header">
+                        <label>
+                            <input type="checkbox" onchange="toggleLayer('veloland')">
+                            🚴 Veloland Schweiz
+                        </label>
+                    </div>
+                    <input type="range" class="opacity-slider" min="0" max="100" value="70" onchange="changeLayerOpacity('veloland', this.value)">
+                    <div class="layer-status">Bereit</div>
+                </div>
+
+                <div class="layer-panel">
+                    <div class="layer-panel-header">
+                        <label>
+                            <input type="checkbox" onchange="toggleLayer('strassen')">
+                            🛣️ Amtliches Strassenverzeichnis
+                        </label>
+                    </div>
+                    <input type="range" class="opacity-slider" min="0" max="100" value="70" onchange="changeLayerOpacity('strassen', this.value)">
+                    <div class="layer-status">Bereit</div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>📊 Filter</h3>
+                <div class="filter-group">
+                    <label>Datenquelle</label>
+                    <select id="dataSourceFilter" onchange="applyFilters()">
+                        <option value="all">Alle Datenquellen</option>
+                        <option value="wfs">Nur WFS-Daten</option>
+                        <option value="dummy">Nur Demo-Daten</option>
+                        <option value="ch">Nur Schweiz-Daten</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Zonentyp</label>
+                    <select id="zoneTypeFilter" onchange="applyFilters()">
+                        <option value="all">Alle Zonen</option>
+                        <option value="Wohnzone">Wohnzonen</option>
+                        <option value="Gewerbezone">Gewerbezonen</option>
+                        <option value="Mischzone">Mischzonen</option>
+                        <option value="Freihaltezone">Freihaltezonen</option>
+                        <option value="Landwirtschaftszone">Landwirtschaftszonen</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Mindestfläche (m²)</label>
+                    <input type="number" id="minArea" placeholder="z.B. 1000" onchange="applyFilters()">
+                </div>
+                <button class="btn btn-secondary" onclick="resetFilters()">Filter zurücksetzen</button>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>🎨 Legende</h3>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff6b6b;"></div>
+                    <span>Wohnzone (W)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4ecdc4;"></div>
+                    <span>Gewerbezone (G)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffa502;"></div>
+                    <span>Mischzone (M)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #95e1d3;"></div>
+                    <span>Freihaltezone (F)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #a8e6cf;"></div>
+                    <span>Landwirtschaftszone (L)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div class="loading-overlay" id="loadingOverlay">
+                <div>🔄 Lade Geodaten...</div>
+            </div>
+
+            <div class="coordinate-display" id="coordDisplay">
+                Koordinaten: ---
+            </div>
+
+            <div class="map-toolbar">
+                <button class="toolbar-btn" title="Messen" onclick="toggleMeasure()">📏</button>
+                <button class="toolbar-btn" title="Info abfragen" onclick="toggleInfo()">ℹ️</button>
+                <button class="toolbar-btn" title="Zoom auf Männedorf" onclick="zoomToMaennedorf()">🏠</button>
+                <button class="toolbar-btn" title="Attributtabelle" onclick="toggleAttributeTable()">📋</button>
+                <button class="toolbar-btn" title="Drucken" onclick="printMap()">🖨️</button>
+                <button class="toolbar-btn" title="Export" onclick="exportData()">💾</button>
+            </div>
+
+            <div class="info-panel">
+                <h4>📊 Statistik</h4>
+                <div class="info-stats">
+                    <div class="stat-item">
+                        <div class="stat-label">Bauzonen</div>
+                        <div class="stat-value" id="totalZones">---</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Gesamtfläche</div>
+                        <div class="stat-value" id="totalArea">---</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Wohnzonen</div>
+                        <div class="stat-value" id="wohnzonen">---</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Gewerbezonen</div>
+                        <div class="stat-value" id="gewerbezonen">---</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="map"></div>
+
+            <button class="table-toggle-btn table-closed" onclick="toggleAttributeTable()">
+                📋 Attributtabelle (Bauzonen)
+            </button>
+
+            <div class="attribute-table-container" id="attributeTable">
+                <div class="table-header">
+                    <h4>📊 Attributtabelle - Alle Bauzonen</h4>
+                    <button class="btn" style="width: auto; padding: 5px 15px;" onclick="toggleAttributeTable()">
+                        Schließen
+                    </button>
+                </div>
+                <div class="table-content">
+                    <table id="zoneTable">
+                        <thead>
+                            <tr>
+                                <th>Quelle</th>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Typ</th>
+                                <th>Fläche (m²)</th>
+                                <th>Gemeinde</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Globale Variablen
+        let map;
+        let currentBaseLayer;
+        let allZones = {
+            wfs: [],    // WFS-Daten vom Kanton Zürich
+            dummy: [],  // Demo-Daten
+            ch: []      // Bauzonen Schweiz Daten
+        };
+        
+        // Layer Management
+        const layers = {
+            zones_wfs: null,
+            zones_dummy: null,
+            bauzonen_ch: null,
+            gemeindegrenzen: null,
+            veloland: null,
+            strassen: null
+        };
+
+        // Filter-Zustand
+        let currentFilters = {
+            dataSource: 'all',
+            zoneType: 'all',
+            minArea: 0
+        };
+
+        // Karte initialisieren
+        function initMap() {
+            console.log('Initialisiere Karte...');
+            map = L.map('map').setView([47.2556, 8.6933], 14);
+            
+            // Basiskarte
+            currentBaseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Maßstab
+            L.control.scale({ position: 'bottomright', imperial: false }).addTo(map);
+
+            // Koordinaten-Anzeige
+            map.on('mousemove', function(e) {
+                document.getElementById('coordDisplay').innerHTML = 
+                    `Koordinaten: ${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+            });
+
+            // Click-Handler für ALLE Layer (Popups für WMS-Layer)
+            map.on('click', async function(e) {
+                await queryAllLayers(e.latlng);
+            });
+
+            // Alle Daten laden
+            loadAllData();
+        }
+
+        // Alle Layer abfragen für Popups
+        async function queryAllLayers(latlng) {
+            const activeLayers = [];
+            let popupContent = '<div class="popup-content">';
+            let hasContent = false;
+
+            // 1. Bauzonen WFS (bereits klickbar)
+            // 2. Demo-Zonen (bereits klickbar)
+            
+            // 3. WMS-Layer über geo.admin.ch API abfragen
+            if (layers.bauzonen_ch && map.hasLayer(layers.bauzonen_ch)) {
+                activeLayers.push('ch.are.bauzonen');
+            }
+            if (layers.gemeindegrenzen && map.hasLayer(layers.gemeindegrenzen)) {
+                activeLayers.push('ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill');
+            }
+            if (layers.veloland && map.hasLayer(layers.veloland)) {
+                activeLayers.push('ch.astra.veloland');
+            }
+            if (layers.strassen && map.hasLayer(layers.strassen)) {
+                activeLayers.push('ch.swisstopo.amtliches-strassenverzeichnis');
+            }
+
+            if (activeLayers.length > 0) {
+                try {
+                    const identifyUrl = 'https://api3.geo.admin.ch/rest/services/api/MapServer/identify?' +
+                        `geometryType=esriGeometryPoint&` +
+                        `geometry=${latlng.lng},${latlng.lat}&` +
+                        `imageDisplay=1000,1000,96&` +
+                        `mapExtent=${map.getBounds().getWest()},${map.getBounds().getSouth()},${map.getBounds().getEast()},${map.getBounds().getNorth()}&` +
+                        `tolerance=5&` +
+                        `layers=all:${activeLayers.join(',')}&` +
+                        `returnGeometry=false&` +
+                        `sr=4326`;
+
+                    const response = await fetch(identifyUrl);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        if (data.results && data.results.length > 0) {
+                            // Gruppiere Ergebnisse nach Layer
+                            const groupedResults = {};
+                            
+                            data.results.forEach(result => {
+                                const layerId = result.layerBodId;
+                                
+                                if (!groupedResults[layerId]) {
+                                    let layerName = layerId;
+                                    if (layerId.includes('bauzonen')) {
+                                        layerName = '🇨🇭 Bauzonen Schweiz';
+                                    } else if (layerId.includes('veloland')) {
+                                        layerName = '🚴 Veloland Schweiz';
+                                    } else if (layerId.includes('gemeinde')) {
+                                        layerName = '🗺️ Gemeindegrenzen';
+                                    } else if (layerId.includes('strassen')) {
+                                        layerName = '🛣️ Strassenverzeichnis';
+                                    }
+                                    
+                                    groupedResults[layerId] = {
+                                        layerName: layerName,
+                                        features: []
+                                    };
+                                }
+                                
+                                groupedResults[layerId].features.push(result);
+                            });
+                            
+                            // Popup-Inhalt erstellen
+                            Object.values(groupedResults).forEach(result => {
+                                popupContent += `<div class="popup-section">`;
+                                popupContent += `<h3 style="margin: 0 0 10px 0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">${result.layerName}</h3>`;
+                                
+                                result.features.forEach(feature => {
+                                    const attrs = feature.attributes || feature.properties || {};
+                                    
+                                    popupContent += '<div style="margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-radius: 4px;">';
+                                    popupContent += '<table style="width: 100%; font-size: 12px; line-height: 1.4;">';
+                                    
+                                    for (const [key, value] of Object.entries(attrs)) {
+                                        if (value !== null && value !== undefined && value !== '' && key !== 'geometry') {
+                                            const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                            let displayValue = value;
+                                            
+                                            if (typeof value === 'number' && value > 1000) {
+                                                displayValue = value.toLocaleString('de-CH');
+                                            }
+                                            
+                                            popupContent += `<tr><td style="padding: 2px; vertical-align: top;"><strong>${displayKey}:</strong></td><td style="padding: 2px;">${displayValue}</td></tr>`;
+                                        }
+                                    }
+                                    
+                                    popupContent += '</table></div>';
+                                });
+                                popupContent += `</div>`;
+                            });
+                            
+                            hasContent = true;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Fehler bei WMS-Abfrage:', error);
+                }
+            }
+
+            popupContent += '</div>';
+
+            // Nur Popup anzeigen wenn Inhalte vorhanden
+            if (hasContent) {
+                L.popup()
+                    .setLatLng(latlng)
+                    .setContent(popupContent)
+                    .openOn(map);
+            }
+        }
+
+        // Alle Daten laden
+        async function loadAllData() {
+            try {
+                // 1. WFS-Daten laden
+                await loadWFSData();
+                
+                // 2. Demo-Daten erstellen
+                loadDemoData();
+                
+                // 3. Bauzonen Schweiz Daten laden
+                await loadBauzonenCHData();
+                
+                document.getElementById('loadingOverlay').classList.add('hidden');
+                updateStatistics();
+                populateAttributeTable();
+                
+            } catch (error) {
+                console.error('Fehler beim Laden:', error);
+                document.getElementById('statusWFS').innerHTML = '❌ Fehler';
+                document.getElementById('statusWFS').className = 'layer-status status-error';
+            }
+        }
+
+        // WFS-Daten laden
+        async function loadWFSData() {
+            try {
+                const wfsUrl = 'https://maps.zh.ch/wfs/OGDZHWFS?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms:ogd-0156_arv_basis_np_gn_zonenflaeche_f&OUTPUTFORMAT=application/json;%20subtype=geojson&SRSNAME=EPSG:4326&BBOX=47.24,8.68,47.27,8.71,EPSG:4326';
+                
+                const response = await fetch(wfsUrl);
+                if (!response.ok) throw new Error('WFS-Fehler');
+                
+                const geojsonData = await response.json();
+                allZones.wfs = processWFSData(geojsonData);
+                
+                // WFS-Layer erstellen
+                layers.zones_wfs = createWFSLayer(geojsonData);
+                layers.zones_wfs.addTo(map);
+                
+            } catch (error) {
+                console.log('WFS nicht verfügbar:', error);
+                allZones.wfs = [];
+                document.getElementById('statusWFS').innerHTML = '❌ Nicht verfügbar';
+                document.getElementById('statusWFS').className = 'layer-status status-error';
+            }
+        }
+
+        // WFS-Daten verarbeiten
+        function processWFSData(geojsonData) {
+            return geojsonData.features.map((feature, index) => ({
+                id: feature.properties.ogc_fid || index + 1,
+                type: feature.properties.typ_kt || 'Unbekannt',
+                name: feature.properties.bezeichnung || `Zone ${index + 1}`,
+                area: feature.properties.flaeche || 0,
+                gemeinde: feature.properties.gemeinde || 'Männedorf',
+                status: feature.properties.rechtsstatus || 'k.A.',
+                quelle: 'WFS Kanton ZH',
+                geometry: feature.geometry,
+                layerType: 'wfs'
+            }));
+        }
+
+        // WFS-Layer erstellen
+        function createWFSLayer(geojsonData) {
+            const zoneColors = {
+                'Wohnzone': '#ff6b6b',
+                'Gewerbezone': '#4ecdc4',
+                'Mischzone': '#ffa502',
+                'Freihaltezone': '#95e1d3',
+                'Landwirtschaftszone': '#a8e6cf',
+                'default': '#95a5a6'
+            };
+
+            function getZoneColor(properties) {
+                const typ = properties.typ_kt || '';
+                if (typ.includes('Wohn')) return zoneColors['Wohnzone'];
+                if (typ.includes('Gewerbe')) return zoneColors['Gewerbezone'];
+                if (typ.includes('Misch')) return zoneColors['Mischzone'];
+                if (typ.includes('Freihalte')) return zoneColors['Freihaltezone'];
+                if (typ.includes('Landwirt')) return zoneColors['Landwirtschaftszone'];
+                return zoneColors['default'];
+            }
+
+            return L.geoJSON(geojsonData, {
+                style: function(feature) {
+                    const color = getZoneColor(feature.properties);
+                    return {
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 0.5,
+                        weight: 2
+                    };
+                },
+                onEachFeature: function(feature, layer) {
+                    const props = feature.properties;
+                    const popupContent = `
+                        <div style="min-width: 280px;">
+                            <h3>${props.bezeichnung || 'Bauzone'}</h3>
+                            <table style="width: 100%; font-size: 13px;">
+                                <tr><td><strong>Typ:</strong></td><td>${props.typ_kt || 'k.A.'}</td></tr>
+                                <tr><td><strong>Fläche:</strong></td><td>${props.flaeche ? Math.round(props.flaeche) + ' m²' : 'k.A.'}</td></tr>
+                                <tr><td><strong>Gemeinde:</strong></td><td>${props.gemeinde || 'k.A.'}</td></tr>
+                                <tr><td><strong>Status:</strong></td><td>${props.rechtsstatus || 'k.A.'}</td></tr>
+                                <tr><td><strong>Quelle:</strong></td><td>WFS Kanton Zürich</td></tr>
+                            </table>
+                        </div>
+                    `;
+                    layer.bindPopup(popupContent);
+                    
+                    // Speichere Layer-ID für Filter
+                    layer._zoneId = props.ogc_fid;
+                    layer._layerType = 'wfs';
+                    layer._zoneType = props.typ_kt || 'Unbekannt';
+                    layer._area = props.flaeche || 0;
+                }
+            });
+        }
+
+        // Demo-Daten laden
+        function loadDemoData() {
+            allZones.dummy = createDemoZones();
+            layers.zones_dummy = createDemoLayer(allZones.dummy);
+            layers.zones_dummy.addTo(map);
+        }
+
+        // Demo-Zonen erstellen
+        function createDemoZones() {
+            const zones = [];
+            const zoneTypes = [
+                { type: 'Wohnzone', color: '#ff6b6b', count: 8 },
+                { type: 'Gewerbezone', color: '#4ecdc4', count: 4 },
+                { type: 'Mischzone', color: '#ffa502', count: 3 },
+                { type: 'Freihaltezone', color: '#95e1d3', count: 3 },
+                { type: 'Landwirtschaftszone', color: '#a8e6cf', count: 5 }
+            ];
+
+            let idCounter = 1;
+
+            zoneTypes.forEach(zoneType => {
+                for (let i = 0; i < zoneType.count; i++) {
+                    const baseLat = 47.2556;
+                    const baseLng = 8.6933;
+                    const offsetLat = (Math.random() - 0.5) * 0.02;
+                    const offsetLng = (Math.random() - 0.5) * 0.03;
+                    
+                    const size = 0.001 + Math.random() * 0.002;
+                    const coordinates = [
+                        [baseLat + offsetLat, baseLng + offsetLng],
+                        [baseLat + offsetLat + size, baseLng + offsetLng],
+                        [baseLat + offsetLat + size, baseLng + offsetLng + size],
+                        [baseLat + offsetLat, baseLng + offsetLng + size],
+                        [baseLat + offsetLat, baseLng + offsetLng]
+                    ];
+
+                    zones.push({
+                        id: idCounter++,
+                        type: zoneType.type,
+                        color: zoneType.color,
+                        name: `${zoneType.type} ${i + 1}`,
+                        coordinates: coordinates,
+                        area: Math.round(5000 + Math.random() * 20000),
+                        gemeinde: 'Männedorf',
+                        status: 'Aktiv',
+                        quelle: 'Demo-Daten',
+                        layerType: 'dummy'
+                    });
+                }
+            });
+
+            return zones;
+        }
+
+        // Demo-Layer erstellen
+        function createDemoLayer(zones) {
+            const layerGroup = L.layerGroup();
+            
+            zones.forEach(zone => {
+                const polygon = L.polygon(zone.coordinates, {
+                    color: zone.color,
+                    fillColor: zone.color,
+                    fillOpacity: 0.4,
+                    weight: 2
+                });
+
+                const popupContent = `
+                    <div style="min-width: 250px;">
+                        <h3>${zone.name}</h3>
+                        <table style="width: 100%; font-size: 13px;">
+                            <tr><td><strong>Typ:</strong></td><td>${zone.type}</td></tr>
+                            <tr><td><strong>Fläche:</strong></td><td>${zone.area.toLocaleString()} m²</td></tr>
+                            <tr><td><strong>Gemeinde:</strong></td><td>${zone.gemeinde}</td></tr>
+                            <tr><td><strong>Status:</strong></td><td>${zone.status}</td></tr>
+                            <tr><td><strong>Quelle:</strong></td><td>Demo-Daten</td></tr>
+                        </table>
+                    </div>
+                `;
+
+                polygon.bindPopup(popupContent);
+                
+                // Speichere Filter-Informationen
+                polygon._zoneId = zone.id;
+                polygon._layerType = 'dummy';
+                polygon._zoneType = zone.type;
+                polygon._area = zone.area;
+                
+                polygon.addTo(layerGroup);
+            });
+
+            return layerGroup;
+        }
+
+        // Bauzonen Schweiz Daten laden
+        async function loadBauzonenCHData() {
+            try {
+                // Für die Attributtabelle: Einige Beispiel-Daten für Bauzonen Schweiz
+                allZones.ch = [
+                    {
+                        id: 'CH-001',
+                        type: 'Wohnzone',
+                        name: 'Wohnzone Zentrum',
+                        area: 125000,
+                        gemeinde: 'Männedorf',
+                        status: 'Harmonisiert',
+                        quelle: 'Bauzonen Schweiz',
+                        layerType: 'ch'
+                    },
+                    {
+                        id: 'CH-002', 
+                        type: 'Gewerbezone',
+                        name: 'Gewerbezone Nord',
+                        area: 85000,
+                        gemeinde: 'Männedorf',
+                        status: 'Harmonisiert',
+                        quelle: 'Bauzonen Schweiz',
+                        layerType: 'ch'
+                    },
+                    {
+                        id: 'CH-003',
+                        type: 'Landwirtschaftszone',
+                        name: 'Landwirtschaft Süd',
+                        area: 220000,
+                        gemeinde: 'Männedorf',
+                        status: 'Harmonisiert',
+                        quelle: 'Bauzonen Schweiz',
+                        layerType: 'ch'
+                    }
+                ];
+                
+            } catch (error) {
+                console.log('Bauzonen CH Daten nicht verfügbar:', error);
+            }
+        }
+
+        // Statistiken aktualisieren
+        function updateStatistics() {
+            const allZoneData = [...allZones.wfs, ...allZones.dummy, ...allZones.ch];
+            const totalZones = allZoneData.length;
+            const totalArea = allZoneData.reduce((sum, zone) => sum + zone.area, 0);
+            const wohnzonen = allZoneData.filter(z => z.type.includes('Wohn')).length;
+            const gewerbezonen = allZoneData.filter(z => z.type.includes('Gewerbe')).length;
+
+            document.getElementById('totalZones').textContent = totalZones;
+            document.getElementById('totalArea').textContent = (totalArea / 10000).toFixed(1) + ' ha';
+            document.getElementById('wohnzonen').textContent = wohnzonen;
+            document.getElementById('gewerbezonen').textContent = gewerbezonen;
+        }
+
+        // Attributtabelle füllen
+        function populateAttributeTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            const allZoneData = [...allZones.wfs, ...allZones.dummy, ...allZones.ch];
+            
+            allZoneData.forEach(zone => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${zone.quelle}</td>
+                    <td>${zone.id}</td>
+                    <td>${zone.name}</td>
+                    <td>${zone.type}</td>
+                    <td>${zone.area.toLocaleString()}</td>
+                    <td>${zone.gemeinde}</td>
+                    <td>${zone.status}</td>
+                `;
+                
+                // Klick-Handler für Zoom
+                row.onclick = () => {
+                    zoomToZone(zone);
+                };
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        // Zur Zone zoomen
+        function zoomToZone(zone) {
+            if (zone.geometry) {
+                // Für WFS-Daten mit GeoJSON-Geometrie
+                const geoJSONLayer = L.geoJSON(zone.geometry);
+                const bounds = geoJSONLayer.getBounds();
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [20, 20], maxZoom: 16 });
+                    highlightZone(zone.id);
+                    return;
+                }
+            }
+            
+            if (zone.coordinates) {
+                // Für Demo-Daten mit Polygon-Koordinaten
+                const bounds = L.latLngBounds(zone.coordinates);
+                map.fitBounds(bounds, { padding: [20, 20], maxZoom: 16 });
+                highlightZone(zone.id);
+                return;
+            }
+            
+            // Fallback: Zur Gemeinde Männedorf zoomen
+            map.setView([47.2556, 8.6933], 14);
+        }
+
+        // Zone hervorheben
+        function highlightZone(zoneId) {
+            // Alle Layer zurücksetzen
+            resetZoneStyles();
+            
+            // In WFS-Layer suchen
+            if (layers.zones_wfs) {
+                layers.zones_wfs.eachLayer(layer => {
+                    const props = layer.feature?.properties;
+                    if (props && (props.ogc_fid === zoneId || props.bezeichnung?.includes(zoneId))) {
+                        layer.setStyle({ weight: 4, fillOpacity: 0.8, color: '#ff0000' });
+                        layer.bringToFront();
+                        layer.openPopup();
+                    }
+                });
+            }
+            
+            // In Demo-Layer suchen
+            if (layers.zones_dummy) {
+                layers.zones_dummy.eachLayer(layer => {
+                    // Einfache Heuristik basierend auf Position
+                    const layerBounds = layer.getBounds();
+                    const center = layerBounds.getCenter();
+                    
+                    const allZonesCombined = [...allZones.wfs, ...allZones.dummy, ...allZones.ch];
+                    const targetZone = allZonesCombined.find(z => z.id === zoneId);
+                    
+                    if (targetZone && targetZone.coordinates) {
+                        const targetCenter = L.latLngBounds(targetZone.coordinates).getCenter();
+                        if (center.distanceTo(targetCenter) < 100) {
+                            layer.setStyle({ weight: 4, fillOpacity: 0.8, color: '#ff0000' });
+                            layer.bringToFront();
+                        }
+                    }
+                });
+            }
+        }
+
+        // Alle Zonen-Stile zurücksetzen
+        function resetZoneStyles() {
+            // WFS-Layer zurücksetzen
+            if (layers.zones_wfs) {
+                layers.zones_wfs.eachLayer(layer => {
+                    const props = layer.feature?.properties;
+                    if (props) {
+                        const color = getZoneColor(props);
+                        layer.setStyle({ 
+                            weight: 2, 
+                            fillOpacity: 0.5, 
+                            color: color,
+                            fillColor: color 
+                        });
+                    }
+                });
+            }
+            
+            // Demo-Layer zurücksetzen
+            if (layers.zones_dummy) {
+                layers.zones_dummy.eachLayer(layer => {
+                    layer.setStyle({ 
+                        weight: 2, 
+                        fillOpacity: 0.4 
+                    });
+                });
+            }
+        }
+
+        // Hilfsfunktion für Farben
+        function getZoneColor(properties) {
+            const zoneColors = {
+                'Wohnzone': '#ff6b6b',
+                'Gewerbezone': '#4ecdc4', 
+                'Mischzone': '#ffa502',
+                'Freihaltezone': '#95e1d3',
+                'Landwirtschaftszone': '#a8e6cf',
+                'default': '#95a5a6'
+            };
+
+            const typ = properties.typ_kt || '';
+            if (typ.includes('Wohn')) return zoneColors['Wohnzone'];
+            if (typ.includes('Gewerbe')) return zoneColors['Gewerbezone'];
+            if (typ.includes('Misch')) return zoneColors['Mischzone'];
+            if (typ.includes('Freihalte')) return zoneColors['Freihaltezone'];
+            if (typ.includes('Landwirt')) return zoneColors['Landwirtschaftszone'];
+            return zoneColors['default'];
+        }
+
+        // Basiskarte wechseln
+        function changeBaseLayer(layerType) {
+            if (currentBaseLayer) {
+                map.removeLayer(currentBaseLayer);
+            }
+
+            switch(layerType) {
+                case 'osm':
+                    currentBaseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+                    break;
+                case 'satellite':
+                    currentBaseLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+                    break;
+                case 'topo':
+                    currentBaseLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png');
+                    break;
+            }
+
+            currentBaseLayer.addTo(map);
+        }
+
+        // Layer umschalten
+        function toggleLayer(layerName) {
+            const checkbox = event.target;
+            const statusElement = checkbox.closest('.layer-panel').querySelector('.layer-status');
+            
+            if (checkbox.checked) {
+                if (!layers[layerName]) {
+                    layers[layerName] = createAdditionalLayer(layerName);
+                }
+                if (layers[layerName]) {
+                    layers[layerName].addTo(map);
+                    statusElement.textContent = '✓ Geladen';
+                    statusElement.style.color = '#28a745';
+                }
+            } else {
+                if (layers[layerName]) {
+                    map.removeLayer(layers[layerName]);
+                }
+                statusElement.textContent = 'Bereit';
+                statusElement.style.color = '#6c757d';
+            }
+        }
+
+        // Zusätzliche Layer erstellen (WMS von geo.admin.ch)
+        function createAdditionalLayer(layerName) {
+            const wmsLayers = {
+                bauzonen_ch: {
+                    url: 'https://wms.geo.admin.ch/',
+                    layers: 'ch.are.bauzonen',
+                    format: 'image/png',
+                    transparent: true,
+                    attribution: '© ARE / Bundesamt für Raumentwicklung'
+                },
+                gemeindegrenzen: {
+                    url: 'https://wms.geo.admin.ch/',
+                    layers: 'ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill',
+                    format: 'image/png',
+                    transparent: true,
+                    attribution: '© swisstopo'
+                },
+                veloland: {
+                    url: 'https://wms.geo.admin.ch/',
+                    layers: 'ch.astra.veloland',
+                    format: 'image/png',
+                    transparent: true,
+                    attribution: '© Bundesamt für Strassen ASTRA'
+                },
+                strassen: {
+                    url: 'https://wms.geo.admin.ch/',
+                    layers: 'ch.swisstopo.amtliches-strassenverzeichnis',
+                    format: 'image/png',
+                    transparent: true,
+                    attribution: '© swisstopo'
+                }
+            };
+
+            const config = wmsLayers[layerName];
+            if (!config) return null;
+
+            try {
+                return L.tileLayer.wms(config.url, {
+                    layers: config.layers,
+                    format: config.format,
+                    transparent: config.transparent,
+                    attribution: config.attribution,
+                    opacity: 0.7
+                });
+            } catch (error) {
+                console.error('Fehler beim Erstellen des Layers:', error);
+                return null;
+            }
+        }
+
+        // Layer-Opazität ändern
+        function changeLayerOpacity(layerName, value) {
+            const opacity = value / 100;
+            
+            if (layers[layerName]) {
+                if (layerName === 'zones_wfs' || layerName === 'zones_dummy') {
+                    layers[layerName].eachLayer(layer => {
+                        layer.setStyle({ fillOpacity: opacity });
+                    });
+                } else {
+                    layers[layerName].setOpacity(opacity);
+                }
+            }
+        }
+
+        // Filter anwenden - DIESE FUNKTION WAR UNVOLLSTÄNDIG
+        function applyFilters() {
+            const dataSource = document.getElementById('dataSourceFilter').value;
+            const typeFilter = document.getElementById('zoneTypeFilter').value;
+            const minArea = parseInt(document.getElementById('minArea').value) || 0;
+
+            // Filter speichern
+            currentFilters = {
+                dataSource: dataSource,
+                zoneType: typeFilter,
+                minArea: minArea
+            };
+
+            let filteredData = [];
+            
+            // Datenquelle filtern
+            if (dataSource === 'wfs') {
+                filteredData = allZones.wfs;
+            } else if (dataSource === 'dummy') {
+                filteredData = allZones.dummy;
+            } else if (dataSource === 'ch') {
+                filteredData = allZones.ch;
+            } else {
+                filteredData = [...allZones.wfs, ...allZones.dummy, ...allZones.ch];
+            }
+
+            // Typ filtern
+            if (typeFilter !== 'all') {
+                filteredData = filteredData.filter(zone => zone.type === typeFilter);
+            }
+
+            // Fläche filtern
+            if (minArea > 0) {
+                filteredData = filteredData.filter(zone => zone.area >= minArea);
+            }
+
+            // KARTENFILTERUNG - DAS WAR FEHLEND
+            applyMapFilters(dataSource, typeFilter, minArea);
+
+            // Attributtabelle aktualisieren
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            filteredData.forEach(zone => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${zone.quelle}</td>
+                    <td>${zone.id}</td>
+                    <td>${zone.name}</td>
+                    <td>${zone.type}</td>
+                    <td>${zone.area.toLocaleString()}</td>
+                    <td>${zone.gemeinde}</td>
+                    <td>${zone.status}</td>
+                `;
+                
+                row.onclick = () => {
+                    zoomToZone(zone);
+                };
+                
+                tbody.appendChild(row);
+            });
+
+            // Statistiken aktualisieren
+            const totalZones = filteredData.length;
+            const totalArea = filteredData.reduce((sum, zone) => sum + zone.area, 0);
+            const wohnzonen = filteredData.filter(z => z.type.includes('Wohn')).length;
+            const gewerbezonen = filteredData.filter(z => z.type.includes('Gewerbe')).length;
+
+            document.getElementById('totalZones').textContent = totalZones;
+            document.getElementById('totalArea').textContent = (totalArea / 10000).toFixed(1) + ' ha';
+            document.getElementById('wohnzonen').textContent = wohnzonen;
+            document.getElementById('gewerbezonen').textContent = gewerbezonen;
+        }
+
+        // KARTENFILTER ANWENDEN - NEUE FUNKTION
+        function applyMapFilters(dataSource, typeFilter, minArea) {
+            // WFS-Layer filtern
+            if (layers.zones_wfs) {
+                layers.zones_wfs.eachLayer(layer => {
+                    let showLayer = true;
+                    
+                    // Datenquelle filtern
+                    if (dataSource !== 'all' && dataSource !== 'wfs') {
+                        showLayer = false;
+                    }
+                    
+                    // Typ filtern
+                    if (showLayer && typeFilter !== 'all') {
+                        const zoneType = layer._zoneType || '';
+                        if (!zoneType.includes(typeFilter.replace('zone', ''))) {
+                            showLayer = false;
+                        }
+                    }
+                    
+                    // Fläche filtern
+                    if (showLayer && minArea > 0) {
+                        const area = layer._area || 0;
+                        if (area < minArea) {
+                            showLayer = false;
+                        }
+                    }
+                    
+                    // Layer-Style entsprechend setzen
+                    if (showLayer) {
+                        layer.setStyle({ 
+                            opacity: 1,
+                            fillOpacity: 0.5
+                        });
+                    } else {
+                        layer.setStyle({ 
+                            opacity: 0.3,
+                            fillOpacity: 0.1
+                        });
+                    }
+                });
+            }
+            
+            // Demo-Layer filtern
+            if (layers.zones_dummy) {
+                layers.zones_dummy.eachLayer(layer => {
+                    let showLayer = true;
+                    
+                    // Datenquelle filtern
+                    if (dataSource !== 'all' && dataSource !== 'dummy') {
+                        showLayer = false;
+                    }
+                    
+                    // Typ filtern
+                    if (showLayer && typeFilter !== 'all') {
+                        const zoneType = layer._zoneType || '';
+                        if (zoneType !== typeFilter) {
+                            showLayer = false;
+                        }
+                    }
+                    
+                    // Fläche filtern
+                    if (showLayer && minArea > 0) {
+                        const area = layer._area || 0;
+                        if (area < minArea) {
+                            showLayer = false;
+                        }
+                    }
+                    
+                    // Layer-Style entsprechend setzen
+                    if (showLayer) {
+                        layer.setStyle({ 
+                            opacity: 1,
+                            fillOpacity: 0.4
+                        });
+                    } else {
+                        layer.setStyle({ 
+                            opacity: 0.3,
+                            fillOpacity: 0.1
+                        });
+                    }
+                });
+            }
+        }
+
+        // Filter zurücksetzen
+        function resetFilters() {
+            document.getElementById('dataSourceFilter').value = 'all';
+            document.getElementById('zoneTypeFilter').value = 'all';
+            document.getElementById('minArea').value = '';
+            
+            // Filter auf Karte zurücksetzen
+            applyMapFilters('all', 'all', 0);
+            
+            populateAttributeTable();
+            updateStatistics();
+        }
+
+        // Auf Männedorf zoomen
+        function zoomToMaennedorf() {
+            map.setView([47.2556, 8.6933], 14);
+        }
+
+        // Messen-Funktion
+        let measureMode = false;
+        let measurePoints = [];
+        let measurePolyline = null;
+        let measureMarkers = [];
+        
+        function toggleMeasure() {
+            measureMode = !measureMode;
+            
+            if (measureMode) {
+                alert('Messmodus aktiviert: Klicken Sie auf die Karte, um Punkte zu setzen. Doppelklick beendet die Messung.');
+                map.getContainer().style.cursor = 'crosshair';
+                map.on('click', onMeasureClick);
+                map.on('dblclick', onMeasureDoubleClick);
+            } else {
+                deactivateMeasure();
+            }
+        }
+
+        function onMeasureClick(e) {
+            measurePoints.push(e.latlng);
+            
+            // Marker setzen
+            const marker = L.circleMarker(e.latlng, {
+                color: '#ff0000',
+                fillColor: '#ff0000',
+                fillOpacity: 0.8,
+                radius: 5
+            }).addTo(map);
+            measureMarkers.push(marker);
+            
+            if (measurePoints.length === 1) {
+                measurePolyline = L.polyline(measurePoints, {color: 'red', weight: 3}).addTo(map);
+            } else {
+                measurePolyline.setLatLngs(measurePoints);
+                
+                let totalDistance = 0;
+                for (let i = 1; i < measurePoints.length; i++) {
+                    totalDistance += measurePoints[i-1].distanceTo(measurePoints[i]);
+                }
+                
+                const distanceText = totalDistance < 1000 
+                    ? Math.round(totalDistance) + ' m'
+                    : (totalDistance / 1000).toFixed(2) + ' km';
+                
+                measurePolyline.bindPopup(`Distanz: ${distanceText}`).openPopup();
+            }
+        }
+
+        function onMeasureDoubleClick() {
+            if (measurePoints.length > 1) {
+                let totalDistance = 0;
+                for (let i = 1; i < measurePoints.length; i++) {
+                    totalDistance += measurePoints[i-1].distanceTo(measurePoints[i]);
+                }
+                
+                const distanceText = totalDistance < 1000 
+                    ? Math.round(totalDistance) + ' m'
+                    : (totalDistance / 1000).toFixed(2) + ' km';
+                
+                alert(`Gemessene Distanz: ${distanceText}`);
+            }
+            
+            deactivateMeasure();
+        }
+
+        function deactivateMeasure() {
+            measureMode = false;
+            map.getContainer().style.cursor = '';
+            map.off('click', onMeasureClick);
+            map.off('dblclick', onMeasureDoubleClick);
+            
+            measureMarkers.forEach(marker => map.removeLayer(marker));
+            if (measurePolyline) map.removeLayer(measurePolyline);
+            
+            measurePoints = [];
+            measureMarkers = [];
+            measurePolyline = null;
+        }
+
+        // Info-Modus
+        function toggleInfo() {
+            alert('Info-Modus aktiviert: Klicken Sie auf die Karte, um Informationen zu allen aktiven Layern anzuzeigen.');
+        }
+
+        // Attributtabelle ein-/ausblenden
+        let attributeTableOpen = false;
+        function toggleAttributeTable() {
+            attributeTableOpen = !attributeTableOpen;
+            const table = document.getElementById('attributeTable');
+            const btn = document.querySelector('.table-toggle-btn');
+            
+            if (attributeTableOpen) {
+                table.classList.add('open');
+                btn.classList.remove('table-closed');
+            } else {
+                table.classList.remove('open');
+                btn.classList.add('table-closed');
+            }
+        }
+
+        // Karte drucken
+        function printMap() {
+            window.print();
+        }
+
+        // Daten exportieren
+        function exportData() {
+            const allZoneData = [...allZones.wfs, ...allZones.dummy, ...allZones.ch];
+            const csvContent = "data:text/csv;charset=utf-8," 
+                + "Quelle,ID,Name,Typ,Fläche (m²),Gemeinde,Status\n"
+                + allZoneData.map(zone => 
+                    `${zone.quelle},${zone.id},"${zone.name}",${zone.type},${zone.area},${zone.gemeinde},${zone.status}`
+                ).join("\n");
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "maennedorf_bauzonen.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Standortsuche
+        function searchLocation() {
+            const searchTerm = document.getElementById('searchInput').value.trim();
+            if (!searchTerm) {
+                alert('Bitte geben Sie einen Suchbegriff ein.');
+                return;
+            }
+
+            // Einfache Geocoding-Implementierung
+            const addressSuggestions = {
+                'seestrasse': [47.256, 8.696],
+                'seedamm': [47.253, 8.691],
+                'dorfstrasse': [47.256, 8.690],
+                'bahnhofstrasse': [47.257, 8.692],
+                'zentrum': [47.256, 8.691],
+                'bahnhof': [47.257, 8.693],
+                'männedorf': [47.2556, 8.6933]
+            };
+
+            const normalizedQuery = searchTerm.toLowerCase().trim();
+            let found = false;
+
+            for (const [key, coords] of Object.entries(addressSuggestions)) {
+                if (normalizedQuery.includes(key)) {
+                    map.setView(coords, 16);
+                    L.marker(coords).addTo(map)
+                        .bindPopup(`Gefunden: ${searchTerm}`)
+                        .openPopup();
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                alert('Adresse nicht gefunden. Bitte versuchen Sie: Seestrasse, Seedamm, Dorfstrasse, Bahnhof, Männedorf, etc.');
+            }
+        }
+
+        // Karte initialisieren
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+        });
+    </script>
+</body>
+</html>
